@@ -403,4 +403,24 @@ export default function App() {
             </form>
 
             {/* 現有清單 */}
-            <div
+            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+              {questions.map((q, idx) => (
+                <div key={q.id} className="bg-[#1e140d] border border-amber-700/40 rounded-xl p-3.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-amber-400">#{idx + 1}</span>
+                      <span className="font-bold text-sm text-amber-200 truncate">{q.title}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => handleDeleteQ(q.id)} className="text-rose-400 hover:text-rose-300 p-2 rounded-lg hover:bg-rose-950/40 transition shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
