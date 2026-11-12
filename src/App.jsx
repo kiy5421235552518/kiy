@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Trophy, Users, Settings, Plus, Trash2, ArrowLeft, 
   CheckCircle, Compass, Map, Key, Sparkles, Award, 
-  Coins, Gift, ArrowRight, XCircle, Edit3, Lock, AlertTriangle, Anchor, Type, Check
+  Coins, Gift, ArrowRight, XCircle, Edit3, Lock, AlertTriangle, 
+  Anchor, Type, Check, Volume2, VolumeX, QrCode
 } from 'lucide-react';
 
 // ==========================================
@@ -20,7 +21,7 @@ const STUDENT_REWARDS_DB = {
 };
 
 // ==========================================
-// 2. 預設 6 大關卡 (結合梧南國小一年級多元評量)
+// 2. 預設 6 大關卡
 // ==========================================
 const INITIAL_STATIONS = [
   {
@@ -97,21 +98,21 @@ const playSound = (type) => {
 };
 
 export default function App() {
-  // 視圖狀態：home, admin_login, login, student_map, student_quiz, success_transition, wrong_transition, result, admin
+  // 視圖狀態：home, admin_login, login, student_intro, student_map, student_quiz, success_transition, wrong_transition, result, admin
   const [view, setView] = useState('home'); 
   
-  // 系統儲存資料 (升級至 v8)
-  const [themeSettings, setThemeSettings] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v8_theme')) || { main: '梧南國小 115學年度', sub: '一年級多元闖關評量' });
-  const [questions, setQuestions] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v8_questions')) || INITIAL_STATIONS);
-  const [gachaList, setGachaList] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v8_gacha')) || INITIAL_GACHA);
-  const [wrongPenalty, setWrongPenalty] = useState(() => Number(localStorage.getItem('wunan_115_v8_penalty')) || 5);
-  const [studentRewards, setStudentRewards] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v8_rewards')) || []);
+  // 系統儲存資料 (升級至 v9)
+  const [themeSettings, setThemeSettings] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v9_theme')) || { main: '梧南國小 115學年度', sub: '一年級多元闖關評量' });
+  const [questions, setQuestions] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v9_questions')) || INITIAL_STATIONS);
+  const [gachaList, setGachaList] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v9_gacha')) || INITIAL_GACHA);
+  const [wrongPenalty, setWrongPenalty] = useState(() => Number(localStorage.getItem('wunan_115_v9_penalty')) || 5);
+  const [studentRewards, setStudentRewards] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v9_rewards')) || []);
 
   // 學生闖關狀態
   const [studentInfo, setStudentInfo] = useState({ id: '', name: '' });
   const [score, setScore] = useState(0); 
-  const [completedStations, setCompletedStations] = useState([]); // 記錄已完成的關卡 ID
-  const [activeStationId, setActiveStationId] = useState(null); // 目前正在挑戰的關卡 ID
+  const [completedStations, setCompletedStations] = useState([]); 
+  const [activeStationId, setActiveStationId] = useState(null); 
   const [fillInText, setFillInText] = useState(''); 
   const [finalGacha, setFinalGacha] = useState(null); 
   const [studentFeedback, setStudentFeedback] = useState(null);
@@ -140,24 +141,46 @@ export default function App() {
   const [newRewardText, setNewRewardText] = useState('');
   const [newRewardImage, setNewRewardImage] = useState('');
 
-  // 儲存效應
-  useEffect(() => localStorage.setItem('wunan_115_v8_theme', JSON.stringify(themeSettings)), [themeSettings]);
-  useEffect(() => localStorage.setItem('wunan_115_v8_questions', JSON.stringify(questions)), [questions]);
-  useEffect(() => localStorage.setItem('wunan_115_v8_gacha', JSON.stringify(gachaList)), [gachaList]);
-  useEffect(() => localStorage.setItem('wunan_115_v8_penalty', wrongPenalty.toString()), [wrongPenalty]);
-  useEffect(() => localStorage.setItem('wunan_115_v8_rewards', JSON.stringify(studentRewards)), [studentRewards]);
+  // ==========================================
+  // 背景音樂 BGM 控制
+  // ==========================================
+  const [isBgmPlaying, setIsBgmPlaying] = useState(false);
+  const bgmRef = useRef(null);
 
-  // ==========================================
-  // 遊戲流程邏輯
-  // ==========================================
-  const handleStartGame = () => { playSound('start'); setView('login'); };
+  const toggleBgm = () => {
+    if (isBgmPlaying) {
+      bgmRef.current.pause();
+    } else {
+      bgmRef.current.play().catch(e => console.log("BGM 自動播放遭阻擋", e));
+    }
+    setIsBgmPlaying(!isBgmPlaying);
+  };
+
+  // 儲存效應
+  useEffect(() => localStorage.setItem('wunan_115_v9_theme', JSON.stringify(themeSettings)), [themeSettings]);
+  useEffect(() => localStorage.setItem('wunan_115_v9_questions', JSON.stringify(questions)), [questions]);
+  useEffect(() => localStorage.setItem('wunan_115_v9_gacha', JSON.stringify(gachaList)), [gachaList]);
+  useEffect(() => localStorage.setItem('wunan_115_v9_penalty', wrongPenalty.toString()), [wrongPenalty]);
+  useEffect(() => localStorage.setItem('wunan_115_v9_rewards', JSON.stringify(studentRewards)), [studentRewards]);
+
+  // 遊戲流程
+  const handleStartGame = () => { 
+    playSound('start'); 
+    setView('login'); 
+  };
 
   const handleLogin = (e) => {
     e.preventDefault();
     if (!studentInfo.id || !studentInfo.name) return alert("請輸入座號與姓名！");
-    setCompletedStations([]); // 清空進度
+    setCompletedStations([]); 
     setScore(0); 
-    setView('student_map'); // 登入後進入「尋寶地圖」
+    // ★ 登入後先進入「情境解說畫面」
+    setView('student_intro'); 
+    
+    // 如果音樂還沒播，登入時順便幫忙點擊播放 (避開瀏覽器限制)
+    if (!isBgmPlaying && bgmRef.current) {
+      bgmRef.current.play().then(() => setIsBgmPlaying(true)).catch(e=>console.log(e));
+    }
   };
 
   const handleSelectStation = (id) => {
@@ -182,7 +205,6 @@ export default function App() {
   };
 
   const goNextFromSuccess = () => {
-    // 判斷是否所有關卡都完成了
     if (completedStations.length >= questions.length) {
       setFinalGacha(gachaList[Math.floor(Math.random() * gachaList.length)]);
       const customReward = studentRewards.find(r => r.id === studentInfo.id) || STUDENT_REWARDS_DB[studentInfo.id];
@@ -193,14 +215,11 @@ export default function App() {
       setStudentFeedback(feedback);
       setView('result');
     } else {
-      // 尚未完成，回到尋寶地圖選關卡
       setView('student_map');
     }
   };
 
-  // ==========================================
   // 教師後台邏輯
-  // ==========================================
   const handleAdminLogin = (e) => {
     e.preventDefault();
     if (adminPasswordInput === 'wunan') {
@@ -259,19 +278,33 @@ export default function App() {
   };
 
   const currentQ = questions.find(q => q.id === activeStationId);
+  const currentDomain = typeof window !== 'undefined' ? window.location.origin : 'https://wunan.vercel.app';
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(currentDomain)}`;
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col items-center justify-center p-3 sm:p-6 relative overflow-x-hidden font-sans selection:bg-amber-500 selection:text-stone-900">
       
+      {/* 🎵 隱藏的背景音樂播放器 (使用輕快海盜探險音樂) */}
+      <audio ref={bgmRef} loop src="https://actions.google.com/sounds/v1/water/waves_crashing_on_rock_beach.ogg" />
+
       {/* 🏴‍☠️ 海盜與寶藏沉浸式背景 🏴‍☠️ */}
       <div className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat bg-fixed" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1519074069444-1ba4fff66d16?q=80&w=1920&auto=format&fit=crop')` }}></div>
       <div className="fixed inset-0 z-0 bg-stone-950/70 backdrop-blur-[1px]"></div>
       <div className="fixed inset-0 z-0 bg-[radial-gradient(circle_at_50%_50%,rgba(217,119,6,0.15)_0%,rgba(12,8,5,0.9)_100%)]"></div>
       <div className="fixed top-1/4 left-1/4 w-[40rem] h-[40rem] bg-amber-600/15 rounded-full blur-[120px] pointer-events-none animate-pulse"></div>
 
-      {/* 右下角：低調的教師後台設定按鈕 */}
+      {/* 🔊 左上角：音樂開關按鈕 */}
+      <button 
+        onClick={toggleBgm} 
+        className="fixed top-6 left-6 p-4 bg-stone-900/60 hover:bg-stone-800 border border-stone-600/50 rounded-full text-amber-400 hover:text-amber-300 transition-all duration-300 shadow-[0_0_15px_rgba(0,0,0,0.6)] backdrop-blur-md z-50 group"
+        title="背景音樂開關"
+      >
+        {isBgmPlaying ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6 text-stone-500" />}
+      </button>
+
+      {/* ⚙️ 右下角：低調的教師後台設定按鈕 */}
       {view === 'home' && (
-        <button onClick={() => setView('admin_login')} className="fixed bottom-6 right-6 p-4 bg-stone-900/60 hover:bg-stone-800 border border-stone-600/50 rounded-full text-stone-400 hover:text-amber-400 transition-all duration-300 shadow-[0_0_15px_rgba(0,0,0,0.6)] backdrop-blur-md z-50 group">
+        <button onClick={() => setView('admin_login')} className="fixed bottom-6 right-6 p-4 bg-stone-900/60 hover:bg-stone-800 border border-stone-600/50 rounded-full text-stone-400 hover:text-amber-400 transition-all duration-300 shadow-[0_0_15px_rgba(0,0,0,0.6)] backdrop-blur-md z-50 group" title="系統管理">
           <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
         </button>
       )}
@@ -291,7 +324,7 @@ export default function App() {
               勇敢的小海盜們！解開隱藏在各個島嶼的謎題，蒐集金幣，並抽取專屬於你的神祕盲盒寶物吧！
             </p>
             <div className="flex justify-center max-w-lg mx-auto">
-              <button onClick={handleStartGame} className="flex items-center justify-center gap-3 bg-gradient-to-b from-amber-500 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-stone-950 font-black py-4 px-10 rounded-2xl text-xl transition-transform hover:scale-[1.02] shadow-lg shadow-amber-900/40">
+              <button onClick={handleStartGame} className="flex items-center justify-center gap-3 bg-gradient-to-b from-amber-500 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-stone-950 font-black py-4 px-10 rounded-2xl text-xl transition-transform hover:scale-[1.02] shadow-lg shadow-amber-900/40 animate-bounce">
                 <Key className="w-6 h-6" /> 登船出發尋寶
               </button>
             </div>
@@ -327,6 +360,23 @@ export default function App() {
               <input type="text" placeholder="你的姓名 (例如: 沛均)" value={studentInfo.name} onChange={e => setStudentInfo({...studentInfo, name: e.target.value})} className="w-full bg-stone-950 border border-stone-700 rounded-xl p-4 text-stone-100 text-center text-lg focus:outline-none focus:border-amber-500 font-bold" />
               <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-stone-50 font-bold py-4 rounded-xl text-lg transition-transform hover:scale-[1.02] shadow-lg mt-4">確認登錄，展開地圖</button>
             </form>
+          </div>
+        )}
+
+        {/* ==================== 3.5 學生情境解說畫面 (前導) ==================== */}
+        {view === 'student_intro' && (
+          <div className="bg-stone-900/95 backdrop-blur-xl border border-amber-900/50 rounded-3xl p-8 sm:p-12 shadow-2xl text-center max-w-2xl mx-auto animate-[fade-in_1s_ease-out]">
+            <img src="https://images.unsplash.com/photo-1596701053887-fdf051a37c04?q=80&w=800&auto=format&fit=crop" alt="寶藏" className="w-full h-48 sm:h-64 object-cover rounded-2xl border-2 border-amber-500/50 shadow-lg mb-6" />
+            <h2 className="text-3xl font-black text-amber-400 mb-4">傳說中的黃金寶藏</h2>
+            <div className="bg-stone-800/80 border border-amber-600/40 rounded-2xl p-6 shadow-inner text-amber-100 text-left relative mb-8 leading-relaxed text-lg">
+              <p>親愛的 <strong className="text-white">{studentInfo.name}</strong>：</p>
+              <p className="mt-2">歡迎來到充滿未知挑戰的神祕海域！</p>
+              <p className="mt-2">據說，這片群島隱藏著梧南國小最珍貴的「多元評量大寶藏」。要獲得寶藏，你必須親自航向各個島嶼，運用你在學校學到的知識，解開所有的謎題！</p>
+              <p className="mt-2 text-amber-300 font-bold">每解開一道謎題，就能獲得金幣，集滿金幣還能開啟神秘盲盒喔！</p>
+            </div>
+            <button onClick={() => setView('student_map')} className="bg-gradient-to-r from-amber-500 to-yellow-500 text-stone-950 font-black py-4 px-12 rounded-2xl text-xl transition-transform hover:scale-[1.02] shadow-[0_10px_25px_rgba(245,158,11,0.4)] flex items-center gap-2 mx-auto">
+              開啟航海地圖 <ArrowRight className="w-6 h-6" />
+            </button>
           </div>
         )}
 
@@ -518,6 +568,20 @@ export default function App() {
               <h2 className="text-xl font-bold text-stone-100 flex items-center gap-2">
                 <Settings className="w-5 h-5 text-amber-500" /> 船長管理室
               </h2>
+            </div>
+
+            {/* ★ 這裡新增了直接產生 QRCode 給學生的功能 ★ */}
+            <div className="mb-10 bg-gradient-to-r from-stone-950 to-stone-900 border border-stone-700 rounded-2xl p-6 shadow-inner flex flex-col sm:flex-row items-center justify-between gap-6">
+              <div className="text-left flex-1">
+                <h3 className="font-bold text-emerald-400 flex items-center gap-2 mb-2">
+                  <QrCode className="w-5 h-5" /> 學生登入 QR Code
+                </h3>
+                <p className="text-sm text-stone-400 mb-2">學生只要用平板掃描右方的 QR Code，就能直接進入闖關畫面囉！</p>
+                <code className="bg-stone-800 px-3 py-1 rounded text-stone-300 text-xs border border-stone-700 select-all">{currentDomain}</code>
+              </div>
+              <div className="bg-white p-2 rounded-xl shrink-0">
+                <img src={qrCodeUrl} alt="登入 QR Code" className="w-32 h-32" />
+              </div>
             </div>
 
             {/* 自訂主題名稱 */}
