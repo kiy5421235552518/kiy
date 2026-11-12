@@ -6,22 +6,7 @@ import {
 } from 'lucide-react';
 
 // ==========================================
-// 1. 學生座號專屬獎勵庫 (老師可在此更換每位孩子的專屬圖片與文字)
-// ==========================================
-const STUDENT_REWARDS_DB = {
-  "01": {
-    text: "沛均在幾何小勇士那一關表現得很棒喔！觀察力非常敏銳，不愧是海盜船上的航海士！",
-    // 老師可以把下面的網址換成你特製的圖片網址
-    image: "https://images.unsplash.com/photo-1589998059171-987d88716cc9?q=80&w=800&auto=format&fit=crop" 
-  },
-  "02": {
-    text: "宸羽今天的拼寫非常正確，是個細心的小探險家，成功解開了寶藏密碼！",
-    image: "https://images.unsplash.com/photo-1563241527-20044cb8fad0?q=80&w=800&auto=format&fit=crop"
-  }
-};
-
-// ==========================================
-// 2. 預設題庫 (包含選擇題、填充題、過關畫面設定)
+// 預設題庫
 // ==========================================
 const INITIAL_STATIONS = [
   {
@@ -79,9 +64,12 @@ const playSound = (type) => {
 export default function App() {
   const [view, setView] = useState('home'); 
   
-  const [questions, setQuestions] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v5_questions')) || INITIAL_STATIONS);
-  const [gachaList, setGachaList] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v5_gacha')) || INITIAL_GACHA);
-  const [wrongPenalty, setWrongPenalty] = useState(() => Number(localStorage.getItem('wunan_115_v5_penalty')) || 5);
+  // 系統儲存資料 (升級至 v6)
+  const [questions, setQuestions] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v6_questions')) || INITIAL_STATIONS);
+  const [gachaList, setGachaList] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v6_gacha')) || INITIAL_GACHA);
+  const [wrongPenalty, setWrongPenalty] = useState(() => Number(localStorage.getItem('wunan_115_v6_penalty')) || 5);
+  // 新增：學生專屬圖文資料庫狀態
+  const [studentRewards, setStudentRewards] = useState(() => JSON.parse(localStorage.getItem('wunan_115_v6_rewards')) || []);
 
   const [studentInfo, setStudentInfo] = useState({ id: '', name: '' });
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -91,6 +79,8 @@ export default function App() {
   const [studentFeedback, setStudentFeedback] = useState(null);
 
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  
+  // 題目表單狀態
   const [qType, setQType] = useState('multiple-choice');
   const [newTitle, setNewTitle] = useState('');
   const [newTag, setNewTag] = useState('');
@@ -102,12 +92,21 @@ export default function App() {
   const [newCoin, setNewCoin] = useState(20);
   const [newSuccMsg, setNewSuccMsg] = useState('');
   const [newSuccImg, setNewSuccImg] = useState('');
+  
+  // 盲盒表單狀態
   const [newGachaName, setNewGachaName] = useState('');
   const [newGachaEmoji, setNewGachaEmoji] = useState('🎁');
 
-  useEffect(() => localStorage.setItem('wunan_115_v5_questions', JSON.stringify(questions)), [questions]);
-  useEffect(() => localStorage.setItem('wunan_115_v5_gacha', JSON.stringify(gachaList)), [gachaList]);
-  useEffect(() => localStorage.setItem('wunan_115_v5_penalty', wrongPenalty.toString()), [wrongPenalty]);
+  // 學生專屬獎勵表單狀態
+  const [newRewardId, setNewRewardId] = useState('');
+  const [newRewardText, setNewRewardText] = useState('');
+  const [newRewardImage, setNewRewardImage] = useState('');
+
+  // 資料更新效應
+  useEffect(() => localStorage.setItem('wunan_115_v6_questions', JSON.stringify(questions)), [questions]);
+  useEffect(() => localStorage.setItem('wunan_115_v6_gacha', JSON.stringify(gachaList)), [gachaList]);
+  useEffect(() => localStorage.setItem('wunan_115_v6_penalty', wrongPenalty.toString()), [wrongPenalty]);
+  useEffect(() => localStorage.setItem('wunan_115_v6_rewards', JSON.stringify(studentRewards)), [studentRewards]);
 
   const handleStartGame = () => { playSound('start'); setView('login'); };
 
@@ -135,13 +134,13 @@ export default function App() {
       setFillInText('');
       setView('student');
     } else {
-      // 抽盲盒
       setFinalGacha(gachaList[Math.floor(Math.random() * gachaList.length)]);
       
-      // 根據座號取得專屬獎勵圖文，若無則給予預設海盜寶藏圖
-      const feedback = STUDENT_REWARDS_DB[studentInfo.id] || {
+      // 從狀態中尋找該學生的專屬獎勵設定
+      const customReward = studentRewards.find(r => r.id === studentInfo.id);
+      const feedback = customReward || {
         text: `${studentInfo.name}，你今天展現了超棒的尋寶精神，成功將寶藏帶回海盜船！繼續保持喔！`,
-        image: "https://images.unsplash.com/photo-1596701053887-fdf051a37c04?q=80&w=800&auto=format&fit=crop" // 預設金幣寶箱圖
+        image: "https://images.unsplash.com/photo-1596701053887-fdf051a37c04?q=80&w=800&auto=format&fit=crop"
       };
       setStudentFeedback(feedback);
       
@@ -151,7 +150,6 @@ export default function App() {
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
-    // ★ 教師後台密碼已更改為 wunan
     if (adminPasswordInput === 'wunan') {
       setView('admin');
       setAdminPasswordInput('');
@@ -184,6 +182,29 @@ export default function App() {
     setNewGachaName('');
   };
 
+  // 新增學生專屬獎勵處理
+  const handleAddStudentReward = (e) => {
+    e.preventDefault();
+    if (!newRewardId || !newRewardText) return alert("請輸入座號與專屬評語！");
+    const existingIdx = studentRewards.findIndex(r => r.id === newRewardId);
+    const newRewardObj = {
+      id: newRewardId,
+      text: newRewardText,
+      image: newRewardImage || "https://images.unsplash.com/photo-1596701053887-fdf051a37c04?q=80&w=800&auto=format&fit=crop"
+    };
+
+    if (existingIdx >= 0) {
+      const updated = [...studentRewards];
+      updated[existingIdx] = newRewardObj;
+      setStudentRewards(updated);
+      alert(`✅ 已更新座號 ${newRewardId} 的專屬獎勵！`);
+    } else {
+      setStudentRewards([...studentRewards, newRewardObj]);
+      alert(`✅ 成功新增座號 ${newRewardId} 的專屬獎勵！`);
+    }
+    setNewRewardId(''); setNewRewardText(''); setNewRewardImage('');
+  };
+
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col items-center justify-center p-3 sm:p-6 relative overflow-x-hidden font-sans selection:bg-amber-500 selection:text-stone-900">
       
@@ -192,11 +213,9 @@ export default function App() {
            style={{ backgroundImage: `url('https://images.unsplash.com/photo-1519074069444-1ba4fff66d16?q=80&w=1920&auto=format&fit=crop')` }}>
       </div>
       
-      {/* 氛圍調色遮罩 (暗角與深褐色調) */}
       <div className="fixed inset-0 z-0 bg-stone-950/70 backdrop-blur-[1px]"></div>
       <div className="fixed inset-0 z-0 bg-[radial-gradient(circle_at_50%_50%,rgba(217,119,6,0.15)_0%,rgba(12,8,5,0.9)_100%)]"></div>
       
-      {/* 模擬油燈呼吸的光暈特效 */}
       <div className="fixed top-1/4 left-1/4 w-[40rem] h-[40rem] bg-amber-600/15 rounded-full blur-[120px] pointer-events-none animate-pulse"></div>
 
       <div className="relative z-10 w-full max-w-3xl">
@@ -297,4 +316,212 @@ export default function App() {
                   ))}
                 </div>
               ) : (
-                <form onSubmit={(e) => { e.preventDefault(); if(fillInText.trim
+                <form onSubmit={(e) => { e.preventDefault(); if(fillInText.trim()) submitAnswer(fillInText.trim() === questions[currentIdx].answer); }} className="flex flex-col sm:flex-row gap-3">
+                  <input type="text" value={fillInText} onChange={e => setFillInText(e.target.value)} placeholder="請輸入你的答案..." className="flex-1 bg-stone-950 border border-stone-700 rounded-xl p-4 text-stone-100 text-lg focus:outline-none focus:border-amber-500 transition-colors" />
+                  <button type="submit" className="bg-amber-600 hover:bg-amber-500 text-stone-50 font-bold px-8 py-4 rounded-xl shadow-lg whitespace-nowrap">送出答案</button>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 5. 答對畫面 ==================== */}
+        {view === 'success_transition' && (
+          <div className="bg-stone-900/95 border border-emerald-500/30 rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(16,185,129,0.15)] text-center relative animate-[fade-in_0.5s_ease-out]">
+            <div className="h-64 w-full bg-cover bg-center" style={{ backgroundImage: `url('${questions[currentIdx].successImage}')` }}></div>
+            <div className="p-8 sm:p-10 relative z-20 -mt-8 bg-gradient-to-b from-transparent to-stone-900 via-stone-900 pt-10">
+              <div className="w-20 h-20 mx-auto bg-emerald-500 rounded-full flex items-center justify-center border-4 border-stone-900 shadow-xl -mt-20 mb-6 relative z-30">
+                <CheckCircle className="w-10 h-10 text-stone-50" />
+              </div>
+              <h2 className="text-3xl font-black text-emerald-400 mb-4">挑戰成功！</h2>
+              <p className="text-stone-200 text-lg font-medium bg-stone-800 p-5 rounded-2xl border border-stone-700 shadow-inner mb-8">
+                {questions[currentIdx].successMessage}
+              </p>
+              <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-6 py-2 rounded-full mb-8">
+                <Coins className="w-5 h-5 text-amber-500" />
+                <span className="text-amber-400 font-bold">獲得 {questions[currentIdx].coinReward || 20} 枚金幣</span>
+              </div>
+              <br />
+              <button onClick={goNextStage} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 px-10 rounded-xl text-lg shadow-lg flex items-center gap-2 mx-auto transition-transform hover:scale-[1.02]">
+                繼續航向下一關 <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 6. 答錯專屬畫面 ==================== */}
+        {view === 'wrong_transition' && (
+          <div className="bg-stone-900/95 border border-rose-500/50 rounded-3xl p-8 sm:p-12 shadow-[0_0_60px_rgba(244,63,94,0.2)] text-center relative animate-[shake_0.5s_ease-in-out]">
+            <div className="w-24 h-24 mx-auto bg-rose-500/20 rounded-full flex items-center justify-center mb-6 border-2 border-rose-500/40">
+              <XCircle className="w-12 h-12 text-rose-500" />
+            </div>
+            
+            <h2 className="text-3xl font-black text-stone-100 mb-4">哎呀！好像不對喔～</h2>
+            <p className="text-stone-300 text-lg mb-8 max-w-md mx-auto">
+              海上探險難免會遇到大風大浪，請再仔細觀察題目，重新挑戰一次吧！
+            </p>
+            
+            {wrongPenalty > 0 && (
+              <div className="inline-flex items-center gap-2 bg-rose-950/50 border border-rose-900/50 px-5 py-2 rounded-full mb-8 text-sm">
+                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <span className="text-rose-300 font-bold">答錯掉落了 {wrongPenalty} 枚金幣</span>
+              </div>
+            )}
+            
+            <br />
+            <button onClick={() => { setFillInText(''); setView('student'); }} className="bg-rose-600 hover:bg-rose-500 text-white font-bold py-4 px-12 rounded-xl text-lg shadow-lg transition-transform hover:scale-[1.02]">
+              再試一次
+            </button>
+          </div>
+        )}
+
+        {/* ==================== 7. 結算與專屬座號獎勵畫面 ==================== */}
+        {view === 'result' && (
+          <div className="bg-stone-900/90 backdrop-blur-xl border border-amber-900/50 rounded-3xl p-6 sm:p-10 shadow-2xl text-center">
+            <h2 className="text-3xl font-black text-stone-100 mb-2">尋寶任務完成！</h2>
+            <div className="text-stone-300 mb-6 font-medium">總共蒐集到了 <span className="text-amber-400 font-bold text-3xl mx-2">{score}</span> 枚金幣</div>
+
+            {studentFeedback && (
+              <div className="mb-8">
+                <img src={studentFeedback.image} alt="專屬獎勵圖" className="w-full h-48 sm:h-64 object-cover rounded-2xl border-2 border-amber-500/50 shadow-lg mb-4" />
+                <div className="bg-stone-800/80 border border-amber-600/40 rounded-2xl p-5 shadow-inner text-amber-100 text-left relative">
+                  <div className="absolute -top-3 left-4 bg-amber-600 text-xs font-bold px-3 py-0.5 rounded text-white shadow-md flex items-center gap-1">
+                    <Anchor className="w-3 h-3" /> 船長的話
+                  </div>
+                  <p className="mt-2 leading-relaxed text-sm sm:text-base font-medium">
+                    {studentFeedback.text}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-gradient-to-br from-stone-800 to-stone-900 border border-stone-700 rounded-3xl p-6 mb-8 relative shadow-inner">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-amber-600 text-stone-50 text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5"><Gift className="w-4 h-4" /> 通關專屬盲盒</div>
+              <p className="text-stone-300 text-sm mb-3 mt-2">恭喜 {studentInfo.name} 抽中神秘大獎：</p>
+              <div className="text-6xl mb-3 animate-bounce">{finalGacha?.emoji}</div>
+              <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-500">{finalGacha?.name}</div>
+            </div>
+
+            <button onClick={() => setView('home')} className="bg-stone-800 hover:bg-stone-700 border border-stone-600 text-stone-200 font-bold py-4 px-10 rounded-xl transition-colors">
+              返回甲板首頁
+            </button>
+          </div>
+        )}
+
+        {/* ==================== 8. 教師後台管理中心 ==================== */}
+        {view === 'admin' && (
+          <div className="bg-stone-900/95 backdrop-blur-xl border border-amber-900/50 rounded-3xl p-6 sm:p-8 shadow-2xl">
+            <div className="flex justify-between items-center mb-8 pb-4 border-b border-stone-800">
+              <button onClick={() => setView('home')} className="text-stone-400 hover:text-stone-200 flex items-center gap-2 font-bold transition-colors">
+                <ArrowLeft className="w-4 h-4" /> 登出後台
+              </button>
+              <h2 className="text-xl font-bold text-stone-100 flex items-center gap-2">
+                <Settings className="w-5 h-5 text-amber-500" /> 船長管理室
+              </h2>
+            </div>
+
+            {/* 難度設定 */}
+            <div className="mb-10 bg-stone-950/50 border border-stone-800 rounded-2xl p-5">
+              <h3 className="font-bold text-rose-400 flex items-center gap-2 mb-4 border-l-4 border-rose-500 pl-3">
+                <AlertTriangle className="w-5 h-5" /> 遊戲難度設定
+              </h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-stone-200 font-bold mb-1">答錯扣除金幣數量</div>
+                  <div className="text-xs text-stone-500">學生答錯時會扣除的金幣 (最低不低於 0)</div>
+                </div>
+                <input type="number" min="0" value={wrongPenalty} onChange={e => setWrongPenalty(Number(e.target.value))} className="w-24 bg-stone-900 border border-stone-700 rounded-lg p-2.5 text-stone-200 text-center font-bold outline-none focus:border-rose-500" />
+              </div>
+            </div>
+
+            {/* ★ 新增區塊：專屬學生獎勵管理 ★ */}
+            <div className="mb-10 bg-stone-950/50 border border-stone-800 rounded-2xl p-5">
+              <h3 className="font-bold text-cyan-400 flex items-center gap-2 mb-4 border-l-4 border-cyan-500 pl-3">
+                <Users className="w-5 h-5" /> 學生過關專屬圖文管理
+              </h3>
+              <form onSubmit={handleAddStudentReward} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-stone-400 mb-1 block">設定座號 (例如：01)</label>
+                    <input type="text" placeholder="輸入座號..." value={newRewardId} onChange={e => setNewRewardId(e.target.value)} className="w-full bg-stone-900 border border-stone-700 rounded-lg p-3 text-stone-200 text-sm outline-none focus:border-cyan-500" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-stone-400 mb-1 block">專屬客製化圖片網址 (URL)</label>
+                    <input type="text" placeholder="貼上你設計好的圖片網址..." value={newRewardImage} onChange={e => setNewRewardImage(e.target.value)} className="w-full bg-stone-900 border border-stone-700 rounded-lg p-3 text-stone-200 text-sm outline-none focus:border-cyan-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-stone-400 mb-1 block">給他的專屬評語 (船長的話)</label>
+                  <textarea placeholder="例如：沛均表現得很好..." value={newRewardText} onChange={e => setNewRewardText(e.target.value)} className="w-full bg-stone-900 border border-stone-700 rounded-lg p-3 text-stone-200 text-sm outline-none focus:border-cyan-500" rows="2" />
+                </div>
+                <button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2.5 px-6 rounded-lg transition-colors w-full sm:w-auto">
+                  儲存專屬獎勵
+                </button>
+              </form>
+
+              {/* 顯示已設定的學生專屬獎勵 */}
+              {studentRewards.length > 0 && (
+                <div className="mt-6 border-t border-stone-800 pt-4">
+                  <div className="text-xs text-stone-400 mb-3">已設定的專屬座號清單：</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {studentRewards.map(r => (
+                      <div key={r.id} className="bg-stone-900 border border-stone-700 p-3 rounded-xl flex items-start gap-3">
+                        <img src={r.image} alt="reward" className="w-12 h-12 rounded-lg object-cover border border-stone-600 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-amber-400 font-black text-sm">座號: {r.id}</div>
+                          <div className="text-stone-300 text-xs truncate mt-1">{r.text}</div>
+                        </div>
+                        <button onClick={() => setStudentRewards(studentRewards.filter(sr => sr.id !== r.id))} className="text-stone-500 hover:text-rose-400 p-1">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 新增題目 */}
+            <div className="mb-10">
+              <h3 className="font-bold text-amber-400 flex items-center gap-2 mb-4 border-l-4 border-amber-500 pl-3"><Edit3 className="w-5 h-5" /> 新增評量關卡</h3>
+              <form onSubmit={handleAddQuestion} className="bg-stone-950/50 border border-stone-800 rounded-2xl p-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <input type="text" placeholder="關卡名稱" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="bg-stone-900 border border-stone-700 rounded-lg p-3 text-stone-200 text-sm outline-none focus:border-amber-500" />
+                  <input type="text" placeholder="領域標籤" value={newTag} onChange={e => setNewTag(e.target.value)} className="bg-stone-900 border border-stone-700 rounded-lg p-3 text-stone-200 text-sm outline-none focus:border-amber-500" />
+                </div>
+                <input type="text" placeholder="題目圖片網址 (URL)" value={newImage} onChange={e => setNewImage(e.target.value)} className="w-full bg-stone-900 border border-stone-700 rounded-lg p-3 text-stone-200 text-sm outline-none focus:border-amber-500" />
+                <textarea placeholder="題目描述..." value={newDesc} onChange={e => setNewDesc(e.target.value)} className="w-full bg-stone-900 border border-stone-700 rounded-lg p-3 text-stone-200 text-sm outline-none focus:border-amber-500" rows="2" />
+                
+                <div className="flex items-center gap-4 bg-stone-900 p-3 rounded-lg border border-stone-700">
+                  <span className="text-stone-400 text-sm font-bold">題型設定：</span>
+                  <label className="flex items-center gap-2 text-sm text-stone-200"><input type="radio" checked={qType === 'multiple-choice'} onChange={() => setQType('multiple-choice')} className="accent-amber-500" /> 選擇題</label>
+                  <label className="flex items-center gap-2 text-sm text-stone-200"><input type="radio" checked={qType === 'fill-in'} onChange={() => setQType('fill-in')} className="accent-amber-500" /> 填充題</label>
+                </div>
+
+                {qType === 'multiple-choice' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-stone-900/50 p-4 rounded-lg border border-stone-800">
+                    {newOptions.map((opt, i) => <input key={i} type="text" placeholder={`選項 ${String.fromCharCode(65 + i)}`} value={opt} onChange={e => { const up = [...newOptions]; up[i] = e.target.value; setNewOptions(up); }} className="bg-stone-900 border border-stone-700 rounded-lg p-2.5 text-stone-200 text-sm outline-none focus:border-amber-500" />)}
+                    <div className="col-span-1 sm:col-span-2 flex items-end justify-end mt-2 gap-3"><span className="text-sm font-bold text-stone-400">正確解答：</span><select value={newMCQAnswer} onChange={e => setNewMCQAnswer(e.target.value)} className="bg-stone-900 border border-stone-700 rounded-lg p-2 text-stone-200 text-sm font-bold outline-none"><option value={0}>選項 A</option><option value={1}>選項 B</option><option value={2}>選項 C</option><option value={3}>選項 D</option></select></div>
+                  </div>
+                ) : (
+                  <div className="bg-stone-900/50 p-4 rounded-lg border border-stone-800"><input type="text" placeholder="請輸入正確的填充題文字解答" value={newFillAnswer} onChange={e => setNewFillAnswer(e.target.value)} className="w-full bg-stone-900 border border-stone-700 rounded-lg p-3 text-stone-200 text-sm outline-none focus:border-amber-500 font-bold" /></div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-stone-800 pt-4">
+                  <div><label className="text-xs text-stone-400 mb-1 block">答對獲得金幣</label><input type="number" placeholder="預設 20" value={newCoin} onChange={e => setNewCoin(e.target.value)} className="w-full bg-stone-900 border border-stone-700 rounded-lg p-2.5 text-stone-200 text-sm outline-none focus:border-amber-500" /></div>
+                  <div><label className="text-xs text-stone-400 mb-1 block">過關稱讚話語</label><input type="text" placeholder="例：太棒了！" value={newSuccMsg} onChange={e => setNewSuccMsg(e.target.value)} className="w-full bg-stone-900 border border-stone-700 rounded-lg p-2.5 text-stone-200 text-sm outline-none focus:border-amber-500" /></div>
+                  <div className="sm:col-span-2"><label className="text-xs text-stone-400 mb-1 block">過關獎勵圖片 (URL)</label><input type="text" placeholder="貼上圖片網址" value={newSuccImg} onChange={e => setNewSuccImg(e.target.value)} className="w-full bg-stone-900 border border-stone-700 rounded-lg p-2.5 text-stone-200 text-sm outline-none focus:border-amber-500" /></div>
+                </div>
+                <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-stone-50 font-bold py-3 rounded-lg mt-2 transition-colors">儲存並新增關卡</button>
+              </form>
+            </div>
+            
+            <div className="text-center text-stone-500 text-sm pt-4 border-t border-stone-800">
+              ※ 系統狀態正常：準備迎接小海盜們的挑戰！
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
